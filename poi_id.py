@@ -18,28 +18,31 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn import preprocessing
 from sklearn.svm import SVC
+from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.pipeline import Pipeline
 import tester
 import copy
 
 
-random_states = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 29, 30, 21, 31, 42, 100]
+random_states = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+                 24, 29, 30, 21, 31, 100, 42]
 
-print "Starting"
+print "# Starting #"
 
 ### Load the dictionary containing the dataset
-print "Loading Data"
+print "# Loading Data #"
 with open("final_project_dataset.pkl", "r") as data_file:
     data_dict = pickle.load(data_file)
 
 
 ### Remove outliers
-print "Removing Outliers"
+print "# Removing Outliers #"
 data_dict.pop('TOTAL')
 
 ### Create new features
 
 
-print "Creating new features"
+print "# Creating new features #"
 
 ## Creating discrete features from continious features that are mostly 'NaN'.
 ## Choosing continious features with more than 80 % 'NaN's. Assigning 0 if NaN or == 0, else 1.
@@ -166,7 +169,7 @@ def get_features_from_correlation(min_corr=0.26):
     return features_list
 
 
-### Store to my_dataset for easy export below.
+### Store to my_dataset for easy export#  below.
 my_dataset = data_dict
 
 ### Extract features and labels from dataset for local testing
@@ -174,19 +177,21 @@ my_dataset = data_dict
 
 # The following feature lists are the result of a add and substract search with Naive Bayes, Desicion Tree and
 # K-Neighbors.
+# started with: ['poi', 'deferred_income', 'count_nans', 'bonus', 'total_stock_value', 'salary',
+# 'exercised_stock_options']
 
 best_nb_feature_list = ['poi', 'deferred_income', 'total_stock_value', 'salary', 'exercised_stock_options', 'expenses']
 
 best_dt_feature_list = ['poi', 'deferred_income', 'exercised_stock_options', 'expenses', 'deferral_payments',
                         'director_fees']
 
-best_knn_feature_list = ['poi', 'bonus', 'salary', 'count_nans', 'exercised_stock_options', 'deferral_payments',
-                         'other']
+best_knn_feature_list_scaled = ['poi', 'deferred_income', 'count_nans', 'total_stock_value',
+                                'exercised_stock_options', 'restricted_stock_deferred',
+                                'restricted_stock_deferred_discrete', 'deferral_payments']
 
-features_list = best_knn_feature_list
+best_knn_feature_list_not_scaled = ['poi', 'bonus', 'salary', 'count_nans', 'exercised_stock_options',
+                                    'deferral_payments', 'other']
 
-data = featureFormat(my_dataset, features_list, sort_keys = True)
-labels, features = targetFeatureSplit(data)
 
 ### Task 4: Try a varity of classifiers
 ### Please name your classifier clf for easy export below.
@@ -194,133 +199,193 @@ labels, features = targetFeatureSplit(data)
 ### you'll need to use Pipelines. For more info:
 ### http://scikit-learn.org/stable/modules/pipeline.html
 
-# The following functions are used for optimization. For local validation I looped 20 times over a train_test_split
-# Besides this validation was mostly done by dumping the classifier, dataset and featurelist, importing the tester.py
-# and running it.
+# The following functions are used for optimization. For local validation I used a simple loop over a train_test_split
+# Besides this validation was mostly done by directly using the tester.main()
 
-def multi_tester_NB(random_states, features, labels):
-    result = []
+## Here are four models:
+
+def NB_model():
+    return GaussianNB()
+
+
+def DT_model(max_depth=None):
+    return DecisionTreeClassifier(max_depth=max_depth)
+
+
+def KNN_model_not_scaled(n_neighbors=5, weights='distance'):
+    return KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights)
+
+
+def KNN_model_scaled(n_neighbors=5, weights='uniform'):
+    return Pipeline([('scaling', preprocessing.StandardScaler()),
+                     ('knn', KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights))])
+
+
+# My own tester
+def test_classifier(features, labels, clf):
+    accu, r_precision, r_recall, r_f1 = [], [], [], []
+
     for n in random_states:
         features_train, features_test, labels_train, labels_test = \
             train_test_split(features, labels, test_size=0.3, random_state=n)
-        clf = GaussianNB()
         clf.fit(features_train, labels_train)
-        result.append(clf.score(features_test, labels_test))
+        pred = clf.predict(features_test)
+        accu.append(clf.score(features_test, labels_test))
+        r_precision.append(precision_score(labels_test, pred))
+        r_recall.append(recall_score(labels_test, pred))
+        r_f1.append(f1_score(labels_test, pred))
     if True:
-        print "Classifier:", "GaussianNB", " Score ave.", np.mean(result)
+        print "Classifier:", "Dessision Tree", len(random_states), "# runs, Score ave.",  np.mean(accu)
+        print "Score, ave:", np.mean(accu), "Precision:", np.mean(r_precision), \
+            "Recall", np.mean(r_recall), "F1", np.mean(r_f1)
         print ""
-    return clf.fit(features, labels)
+    return KNN_model_not_scaled()
 
 
-def multi_tester_DT(random_states, features, labels):
-    result = []
-    for n in random_states:
-        features_train, features_test, labels_train, labels_test = \
-            train_test_split(features, labels, test_size=0.3, random_state=n)
-        clf = DecisionTreeClassifier()
-        clf.fit(features_train, labels_train)
-        result.append(clf.score(features_test, labels_test))
-    if True:
-        print "Classifier:", "Dessision Tree", len(random_states), "# runs, Score ave.",  np.mean(result)
-        print ""
-
-    return clf.fit(features, labels)
-
-
-def multi_tester_KNN(random_states, features, labels):
-    result = []
-    for n in random_states:
-        features_train, features_test, labels_train, labels_test = \
-            train_test_split(features, labels, test_size=0.3, random_state=n)
-        clf = KNeighborsClassifier()
-        clf.fit(features_train, labels_train)
-        result.append(clf.score(features_test, labels_test))
-    if True:
-        print "Classifier:", "Dessision Tree", len(random_states), "# runs, Score ave.",  np.mean(result)
-        print ""
-
-    return KNeighborsClassifier(n_neighbors=5).fit(features, labels)
-
-
-function_used = multi_tester_KNN
-
-if True:
-    # Baseline
-    clf = function_used(random_states, features, labels)
-    dump_classifier_and_data(clf, my_dataset, features_list)
+# wrapper for the tester.py
+def baseline_tester(features_list, classifier):
+    dump_classifier_and_data(classifier, my_dataset, features_list)
     tester.main()
 
+# wrapper for my own tester
+def baseline_own_testing():
+    labels, features = targetFeatureSplit(featureFormat(my_dataset, best_knn_feature_list_scaled,
+                                                        sort_keys=True))
+    test_classifier(features, labels, KNN_model_scaled())
 
-def vary_features(base_features, tester_function):
-    # Function tries to add all features one by one and prints the scores. Elimination was done manually. Adding and
-    # elimination were done in sequence until I didn't find significant improvements
-    print "Baseline"
-    data = featureFormat(my_dataset, base_features, sort_keys=True)
-    labels, features = targetFeatureSplit(data)
-    clf = tester_function(random_states, features, labels)
-    dump_classifier_and_data(clf, my_dataset, base_features)
-    tester.main()
+# Run the tester
+if False:
+    baseline_tester(best_nb_feature_list, NB_model())
 
-    original = copy.copy(base_features)
+
+# Function to add (and substract) features for search for best feature combination
+def vary_features_add(features, classifier):
+    print "Baseline - adding"
+    baseline_tester(features, classifier)
+
+    original = copy.copy(features)
     for feat in all_features:
         print "trying: ", feat
-        base_features = copy.copy(original)
+        features = copy.copy(original)
 
-        if feat in base_features:
-            print "allready used"
-            print ""
+        if feat in features:
             continue
         else:
-            base_features.append(feat)
-        print "features used:", len(base_features), " -> ", base_features
+            features.append(feat)
+        print "features used:", len(features), " -> ", features
 
-        data = featureFormat(my_dataset, base_features, sort_keys = True)
-        labels, features = targetFeatureSplit(data)
-        clf = tester_function(random_states, features, labels)
-        dump_classifier_and_data(clf, my_dataset, base_features)
+        dump_classifier_and_data(classifier, my_dataset, features)
         tester.main()
 
+
+def vary_features_eliminate(features, classifier):
+    print "Baseline - Elimination"
+    baseline_tester(features, classifier)
+
+    original = copy.copy(features)
+    for i, feat in enumerate(features[1:]):
+        features = copy.copy(original)
+        print "trying", feat
+        features.pop(i + 1)
+        print "features used:", len(features), " -> ", features
+        dump_classifier_and_data(classifier, my_dataset, features)
+        tester.main()
+
+
+# wrapper for the vary functions
+def vary_wrapper(feat_list, model):
+    print "# Varying features #"
+    print "## Elimiating ##"
+    vary_features_eliminate(feat_list, model)
+    print "## Adding ##"
+    vary_features_add(feat_list, model)
+
+
+# Run the wrapper
 if False:
-    vary_features(base_features=features_list, tester_function=function_used)
+    vary_wrapper(best_nb_feature_list, NB_model())
+
+
+# some tuning functions to find the best params for the models
+def tuning_knn_scaled():
+    """
+    Best: k = 5, weights = 'uniform'
+    """
+    for n in range(1, 11):
+        print n, 'uniform'
+        baseline_tester(best_knn_feature_list_scaled, KNN_model_scaled(n, 'uniform'))
+        print n, 'distance'
+        baseline_tester(best_knn_feature_list_scaled, KNN_model_scaled(n, 'distance'))
+
+
+def tuning_knn_not_scaled():
+    """
+    Best: k = 5, weights = 'distance'
+    """
+    for n in range(1, 11):
+        print n, 'uniform'
+        baseline_tester(best_knn_feature_list_not_scaled, KNN_model_not_scaled(n, 'uniform'))
+        print n, 'distance'
+        baseline_tester(best_knn_feature_list_not_scaled, KNN_model_not_scaled(n, 'distance'))
+
+
+def tuning_dt():
+    """
+    Best: max_depth=None
+    Most important features:
+    clf.feature_importances_ -> [ 0.12174062  0.11639965  0.30168325  0.35446053  0.          0. 0.10571595]
+    Most important: 'expenses', 2nd: 'exercised_stock_options'
+    """
+    if True:
+        print "max depth"
+        print "none"
+        baseline_tester(best_dt_feature_list, DT_model(max_depth=None))
+        for n in range(1, 10):
+            print n
+            baseline_tester(best_dt_feature_list, DT_model(max_depth=n))
+    if True:
+        labels, features = targetFeatureSplit(featureFormat(my_dataset, best_knn_feature_list_scaled,
+                                                            sort_keys=True))
+        clf = DT_model()
+        clf.fit(features, labels)
+        print "Feature Importances"
+        print clf.feature_importances_
 
 
 def show_final_scores():
+    """
+    Function show all four classfiers.
+    """
     print ""
     print "*** Final Scores ***"
     print ""
     print "Naive Bayes"
-    data = featureFormat(my_dataset, best_nb_feature_list, sort_keys=True)
-    labels, features = targetFeatureSplit(data)
-    clf = GaussianNB()
-    clf.fit(features, labels)
-    dump_classifier_and_data(clf, my_dataset, best_nb_feature_list)
+    dump_classifier_and_data(NB_model(), my_dataset, best_nb_feature_list)
     tester.main()
     print ""
     print "Desicion Tree"
-    data = featureFormat(my_dataset, best_dt_feature_list, sort_keys=True)
-    labels, features = targetFeatureSplit(data)
-    clf = DecisionTreeClassifier()
-    clf.fit(features, labels)
-    dump_classifier_and_data(clf, my_dataset, best_dt_feature_list)
+    dump_classifier_and_data(DT_model(), my_dataset, best_dt_feature_list)
     tester.main()
     print ""
-    print "K-Neigbohrs"
-    data = featureFormat(my_dataset, best_knn_feature_list, sort_keys=True)
-    labels, features = targetFeatureSplit(data)
-    clf = KNeighborsClassifier(n_neighbors=5)
-    clf.fit(preprocessing.scale(features), labels)
-    dump_classifier_and_data(clf, my_dataset, best_knn_feature_list)
+    print "K-Neigbohrs scaled"
+    dump_classifier_and_data(KNN_model_scaled(), my_dataset, best_knn_feature_list_scaled)
+    tester.main()
+    print ""
+    print "K-Neighbors not scaled"
+    dump_classifier_and_data(KNN_model_not_scaled(), my_dataset, best_knn_feature_list_not_scaled)
     tester.main()
 
 
-# show_final_scores()
+show_final_scores()
 
 
 if True:
-    print "Submitting final model: K-Neighbors"
-    labels, features = targetFeatureSplit(featureFormat(my_dataset, best_knn_feature_list, sort_keys=True))
-    dump_classifier_and_data(KNeighborsClassifier(n_neighbors=5).fit(features, labels),
+    # Surprisingly I was not able to train the K-Neighbors algorithm for the scaled features as well as for the
+    # unscaled. With a Precision of .73, a recall of .43 and a F1 of .54 this seems to be the best. I used
+    # n_neighbors = 5 and weights = 'distance'
+    print "# Submitting final model: K-Neighbors not scaled #"
+    dump_classifier_and_data(KNN_model_not_scaled(),
                              my_dataset,
-                             best_knn_feature_list)
+                             best_knn_feature_list_not_scaled)
 
-print "End"
+print "# End #"
