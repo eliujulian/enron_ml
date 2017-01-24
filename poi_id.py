@@ -17,7 +17,6 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn import preprocessing
-from sklearn.svm import SVC
 from sklearn.metrics import precision_score, recall_score, f1_score
 from sklearn.pipeline import Pipeline
 import tester
@@ -41,11 +40,8 @@ data_dict.pop('TOTAL')
 
 ### Create new features
 
+print "# Data Exploration #"
 
-print "# Creating new features #"
-
-## Creating discrete features from continious features that are mostly 'NaN'.
-## Choosing continious features with more than 80 % 'NaN's. Assigning 0 if NaN or == 0, else 1.
 
 def get_nan_ratios(ratio=0.0):
     """
@@ -57,6 +53,24 @@ def get_nan_ratios(ratio=0.0):
         if r >= ratio:
             result.append((x, r))
     return result
+
+
+if False:
+    # total number of data points: 145
+    print "total number of data points:", len(data_dict)
+    # allocation across classes (POI/non-POI): 18  /  127
+    print "allocation across classes (POI/non-POI):", sum([v['poi'] for k, v in data_dict.iteritems()]), " / ", \
+        len(data_dict) - sum([v['poi'] for k, v in data_dict.iteritems()])
+    # features with more than 70 % NaNs [('restricted_stock_deferred', 0.8827586206896552),
+    # ('loan_advances', 0.9793103448275862), ('director_fees', 0.8896551724137931)]
+    print "features with more than 75 % NaNs", get_nan_ratios(ratio=0.75)
+
+
+## Creating discrete features from continious features that are mostly 'NaN'.
+## Choosing continious features with more than 80 % 'NaN's. Assigning 0 if NaN or == 0, else 1.
+
+
+print "# Creating new features #"
 
 
 def new_discrete_feature(feature):
@@ -180,6 +194,20 @@ my_dataset = data_dict
 # started with: ['poi', 'deferred_income', 'count_nans', 'bonus', 'total_stock_value', 'salary',
 # 'exercised_stock_options']
 
+starting_features = ['poi',
+                     'deferred_income',
+                     'count_nans',
+                     # 'bonus',
+                     # 'total_stock_value',
+                     'salary',
+                     'exercised_stock_options',
+                     'expenses',
+                     'to_messages',
+                     'shared_receipt_with_poi',
+                     'other',
+                     'from_poi_to_this_person'
+                     ]
+
 best_nb_feature_list = ['poi', 'deferred_income', 'total_stock_value', 'salary', 'exercised_stock_options', 'expenses']
 
 best_dt_feature_list = ['poi', 'deferred_income', 'exercised_stock_options', 'expenses', 'deferral_payments',
@@ -192,6 +220,7 @@ best_knn_feature_list_scaled = ['poi', 'deferred_income', 'count_nans', 'total_s
 best_knn_feature_list_not_scaled = ['poi', 'bonus', 'salary', 'count_nans', 'exercised_stock_options',
                                     'deferral_payments', 'other']
 
+best_adaboost_feature_list = []
 
 ### Task 4: Try a varity of classifiers
 ### Please name your classifier clf for easy export below.
@@ -221,6 +250,15 @@ def KNN_model_scaled(n_neighbors=5, weights='uniform'):
                      ('knn', KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights))])
 
 
+from sklearn.ensemble import AdaBoostClassifier
+
+def AdA_model():
+    """
+    Initial results were good but training and testing is a lot slower than the other models.
+    """
+    return AdaBoostClassifier()
+
+
 # My own tester
 def test_classifier(features, labels, clf):
     accu, r_precision, r_recall, r_f1 = [], [], [], []
@@ -247,6 +285,7 @@ def baseline_tester(features_list, classifier):
     dump_classifier_and_data(classifier, my_dataset, features_list)
     tester.main()
 
+
 # wrapper for my own tester
 def baseline_own_testing():
     labels, features = targetFeatureSplit(featureFormat(my_dataset, best_knn_feature_list_scaled,
@@ -254,8 +293,9 @@ def baseline_own_testing():
     test_classifier(features, labels, KNN_model_scaled())
 
 # Run the tester
-if False:
-    baseline_tester(best_nb_feature_list, NB_model())
+if True:
+    print "# Running a Model #"
+    baseline_tester(starting_features, AdA_model())
 
 
 # Function to add (and substract) features for search for best feature combination
@@ -296,14 +336,14 @@ def vary_features_eliminate(features, classifier):
 def vary_wrapper(feat_list, model):
     print "# Varying features #"
     print "## Elimiating ##"
-    vary_features_eliminate(feat_list, model)
+    #vary_features_eliminate(feat_list, model)
     print "## Adding ##"
     vary_features_add(feat_list, model)
 
 
 # Run the wrapper
-if False:
-    vary_wrapper(best_nb_feature_list, NB_model())
+if True:
+    vary_wrapper(starting_features, AdA_model())
 
 
 # some tuning functions to find the best params for the models
@@ -376,10 +416,11 @@ def show_final_scores():
     tester.main()
 
 
-show_final_scores()
+if False:
+    show_final_scores()
 
 
-if True:
+if False:
     # Surprisingly I was not able to train the K-Neighbors algorithm for the scaled features as well as for the
     # unscaled. With a Precision of .73, a recall of .43 and a F1 of .54 this seems to be the best. I used
     # n_neighbors = 5 and weights = 'distance'
