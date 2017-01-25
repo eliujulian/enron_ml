@@ -19,12 +19,11 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn import preprocessing
 from sklearn.metrics import precision_score, recall_score, f1_score
 from sklearn.pipeline import Pipeline
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.model_selection import StratifiedShuffleSplit
 import tester
 import copy
 
-
-random_states = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-                 24, 29, 30, 21, 31, 100, 42]
 
 print "# Starting #"
 
@@ -194,19 +193,8 @@ my_dataset = data_dict
 # started with: ['poi', 'deferred_income', 'count_nans', 'bonus', 'total_stock_value', 'salary',
 # 'exercised_stock_options']
 
-starting_features = ['poi',
-                     'deferred_income',
-                     'count_nans',
-                     # 'bonus',
-                     # 'total_stock_value',
-                     'salary',
-                     'exercised_stock_options',
-                     'expenses',
-                     'to_messages',
-                     'shared_receipt_with_poi',
-                     'other',
-                     'from_poi_to_this_person'
-                     ]
+starting_features = ['poi', 'deferred_income', 'count_nans', 'bonus', 'total_stock_value', 'salary',
+                     'exercised_stock_options']
 
 best_nb_feature_list = ['poi', 'deferred_income', 'total_stock_value', 'salary', 'exercised_stock_options', 'expenses']
 
@@ -220,7 +208,8 @@ best_knn_feature_list_scaled = ['poi', 'deferred_income', 'count_nans', 'total_s
 best_knn_feature_list_not_scaled = ['poi', 'bonus', 'salary', 'count_nans', 'exercised_stock_options',
                                     'deferral_payments', 'other']
 
-best_adaboost_feature_list = []
+best_adaboost_feature_list = ['poi', 'deferred_income', 'count_nans', 'salary', 'exercised_stock_options',
+                              'expenses', 'to_messages', 'shared_receipt_with_poi', 'other', 'from_poi_to_this_person']
 
 ### Task 4: Try a varity of classifiers
 ### Please name your classifier clf for easy export below.
@@ -231,7 +220,7 @@ best_adaboost_feature_list = []
 # The following functions are used for optimization. For local validation I used a simple loop over a train_test_split
 # Besides this validation was mostly done by directly using the tester.main()
 
-## Here are four models:
+## Here are five models:
 
 def NB_model():
     return GaussianNB()
@@ -250,8 +239,6 @@ def KNN_model_scaled(n_neighbors=5, weights='uniform'):
                      ('knn', KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights))])
 
 
-from sklearn.ensemble import AdaBoostClassifier
-
 def AdA_model():
     """
     Initial results were good but training and testing is a lot slower than the other models.
@@ -261,23 +248,38 @@ def AdA_model():
 
 # My own tester
 def test_classifier(features, labels, clf):
+    """
+    The difference to the tester.py is that the metrics are calculated for every run an averaged at the end.
+    """
     accu, r_precision, r_recall, r_f1 = [], [], [], []
+    cv = StratifiedShuffleSplit(n_splits=2500, test_size=0.3, random_state=42)
+    for train_indx, test_indx in cv.split(features, labels):
+        features_train = []
+        features_test = []
+        labels_train = []
+        labels_test = []
 
-    for n in random_states:
-        features_train, features_test, labels_train, labels_test = \
-            train_test_split(features, labels, test_size=0.3, random_state=n)
+        for i in train_indx:
+            features_train.append(features[i])
+            labels_train.append(labels[i])
+        for i in test_indx:
+            features_test.append(features[i])
+            labels_test.append(labels[i])
+
         clf.fit(features_train, labels_train)
         pred = clf.predict(features_test)
-        accu.append(clf.score(features_test, labels_test))
-        r_precision.append(precision_score(labels_test, pred))
-        r_recall.append(recall_score(labels_test, pred))
-        r_f1.append(f1_score(labels_test, pred))
+
+        if sum(pred) > 0:
+            accu.append(clf.score(features_test, labels_test))
+            r_precision.append(precision_score(labels_test, pred))
+            r_recall.append(recall_score(labels_test, pred))
+            r_f1.append(f1_score(labels_test, pred))
+
     if True:
-        print "Classifier:", "Dessision Tree", len(random_states), "# runs, Score ave.",  np.mean(accu)
-        print "Score, ave:", np.mean(accu), "Precision:", np.mean(r_precision), \
+        print "Classifier:", clf
+        print "Accuracy:", np.mean(accu), "Precision:", np.mean(r_precision), \
             "Recall", np.mean(r_recall), "F1", np.mean(r_f1)
         print ""
-    return KNN_model_not_scaled()
 
 
 # wrapper for the tester.py
@@ -287,15 +289,16 @@ def baseline_tester(features_list, classifier):
 
 
 # wrapper for my own tester
-def baseline_own_testing():
-    labels, features = targetFeatureSplit(featureFormat(my_dataset, best_knn_feature_list_scaled,
+def baseline_own_testing(feat, cls):
+    labels, features = targetFeatureSplit(featureFormat(my_dataset, feat,
                                                         sort_keys=True))
-    test_classifier(features, labels, KNN_model_scaled())
+    test_classifier(features, labels, cls)
 
 # Run the tester
 if False:
     print "# Running a Model #"
-    baseline_tester(starting_features, AdA_model())
+    # baseline_tester(best_knn_feature_list_not_scaled, KNN_model_not_scaled(weights="uniform"))
+    baseline_own_testing(best_knn_feature_list_not_scaled, KNN_model_not_scaled(weights="uniform"))
 
 
 # Function to add (and substract) features for search for best feature combination
@@ -394,10 +397,14 @@ def tuning_dt():
 
 def show_final_scores():
     """
-    Function show all four classfiers.
+    Function shows all classifiers and their performance on the tester.py.
     """
     print ""
     print "*** Final Scores ***"
+    print ""
+    print "AdaBoost"
+    dump_classifier_and_data(AdA_model(), my_dataset, best_adaboost_feature_list)
+    tester.main()
     print ""
     print "Naive Bayes"
     dump_classifier_and_data(NB_model(), my_dataset, best_nb_feature_list)
@@ -408,10 +415,12 @@ def show_final_scores():
     tester.main()
     print ""
     print "K-Neigbohrs scaled"
+    print "features used", best_knn_feature_list_scaled
     dump_classifier_and_data(KNN_model_scaled(), my_dataset, best_knn_feature_list_scaled)
     tester.main()
     print ""
     print "K-Neighbors not scaled"
+    print "features used", best_knn_feature_list_not_scaled
     dump_classifier_and_data(KNN_model_not_scaled(), my_dataset, best_knn_feature_list_not_scaled)
     tester.main()
 
@@ -420,7 +429,7 @@ if True:
     show_final_scores()
 
 
-if False:
+if True:
     # Surprisingly I was not able to train the K-Neighbors algorithm for the scaled features as well as for the
     # unscaled. With a Precision of .73, a recall of .43 and a F1 of .54 this seems to be the best. I used
     # n_neighbors = 5 and weights = 'distance'
