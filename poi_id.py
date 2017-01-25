@@ -293,7 +293,7 @@ def baseline_own_testing():
     test_classifier(features, labels, KNN_model_scaled())
 
 # Run the tester
-if True:
+if False:
     print "# Running a Model #"
     baseline_tester(starting_features, AdA_model())
 
@@ -336,13 +336,13 @@ def vary_features_eliminate(features, classifier):
 def vary_wrapper(feat_list, model):
     print "# Varying features #"
     print "## Elimiating ##"
-    #vary_features_eliminate(feat_list, model)
+    vary_features_eliminate(feat_list, model)
     print "## Adding ##"
     vary_features_add(feat_list, model)
 
 
 # Run the wrapper
-if True:
+if False:
     vary_wrapper(starting_features, AdA_model())
 
 
@@ -416,7 +416,7 @@ def show_final_scores():
     tester.main()
 
 
-if False:
+if True:
     show_final_scores()
 
 

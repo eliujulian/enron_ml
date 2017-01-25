@@ -28,5 +28,11 @@ For the scaled features 'uniform' weighting did best, for the unscaled 'distance
 
 6. Give at least 2 evaluation metrics and your average performance for each of them.  Explain an interpretation of your metrics that says something human-understandable about your algorithm’s performance. [relevant rubric item: “usage of evaluation metrics”]
 
-* Accuracy: 0.90427	Precision: 0.73818	Recall: 0.43700	F1: 0.54899	F2: 0.47583
-	Total predictions: 15000	True positives:  874	False positives:  310	False negatives: 1126	True negatives: 12690
+* Accuracy: The rate of true predictions compared to all predictions.
+* Precision: The rate of true positives predicted compared to all positively predicted elements.
+* Recall: The rate of true positives predicted to all positive data points.
+* F1-Score: The harmonic mean of precision and recall.
+* My model was able to reach the following metrics: Accuracy: 0.90427	Precision: 0.73818	Recall: 0.43700	F1: 0.54899	F2: 0.47583
+* The high accuracy score of 90 % is only a bit better than pure chance, since about 85 % of the dataset is negativ. 
+The recall of 44 % means, that about 44 % of the relevant poi's will be found by the model. Of those found about 74 % are
+actually positive. 
