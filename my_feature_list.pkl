@@ -5,8 +5,12 @@ aS'bonus'
 p2
 aS'exercised_stock_options'
 p3
-aS'salary'
+aS'total_stock_value'
 p4
-aS'loan_advances_discrete'
+aS'deferral_payments'
 p5
+aS'restricted_stock_deferred_discrete'
+p6
+aS'restricted_stock_deferred'
+p7
 a.

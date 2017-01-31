@@ -500,10 +500,10 @@ if False:
     # tuning_knn_scaled()
     print tuning_knn(best_knn_feature_list_scaled)
 
-if True:
+if False:
     show_final_scores()
 
-if False:
+if True:
     # Surprisingly I was not able to train the K-Neighbors algorithm for the scaled features as well as for the
     # unscaled. With a Precision of .73, a recall of .43 and a F1 of .54 this seems to be the best. I used
     # n_neighbors = 5 and weights = 'distance'
