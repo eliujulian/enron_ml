@@ -21,6 +21,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import GridSearchCV
 import tester
 import copy
 
@@ -141,7 +142,6 @@ count_all_words(add_to_dicts=True)
 all_features = list(data_dict['SKILLING JEFFREY K'].keys())
 all_features.pop(6) # Remove email
 
-
 # I used the following features to select some feature to start feeding into the classifiers
 def correlation_with_nan_as_zero():
     """
@@ -182,6 +182,38 @@ def get_features_from_correlation(min_corr=0.26):
     return features_list
 
 
+def get_pandas_dataframe(nan_as_zero=False):
+    df =  pd.DataFrame.from_dict(data_dict).transpose()
+    if nan_as_zero:
+        def convert(x):
+            if isinstance(x, int):
+                return x
+            elif isinstance(x, str):
+                if x == "NaN":
+                    return 0
+                elif x.isalnum():
+                    return int(x)
+                else:
+                    raise Exception("Not possible")
+        for c in all_features:
+            df[c] = [convert(n) for n in df[c]]
+    return df
+
+
+def get_starting_features_from_df(min_corr=0.26, print_results=False):
+    df = get_pandas_dataframe(nan_as_zero=True).corr()
+    df_corr_poi = df['poi']
+    result = df_corr_poi[abs(df_corr_poi) >= 0.26]
+
+    if print_results:
+        print result.sort_values(ascending=False)
+
+    result = [n for n in result.axes[0]]
+    result.remove('poi')
+    result.insert(0, 'poi')
+    return result
+
+
 ### Store to my_dataset for easy export#  below.
 my_dataset = data_dict
 
@@ -193,20 +225,21 @@ my_dataset = data_dict
 # started with: ['poi', 'deferred_income', 'count_nans', 'bonus', 'total_stock_value', 'salary',
 # 'exercised_stock_options']
 
-starting_features = ['poi', 'deferred_income', 'count_nans', 'bonus', 'total_stock_value', 'salary',
-                     'exercised_stock_options']
+starting_features = get_starting_features_from_df(print_results=False)
+
+temp_list = ['poi', 'exercised_stock_options', 'deferral_payments']
 
 best_nb_feature_list = ['poi', 'deferred_income', 'total_stock_value', 'salary', 'exercised_stock_options', 'expenses']
 
 best_dt_feature_list = ['poi', 'deferred_income', 'exercised_stock_options', 'expenses', 'deferral_payments',
                         'director_fees']
 
-best_knn_feature_list_scaled = ['poi', 'deferred_income', 'count_nans', 'total_stock_value',
-                                'exercised_stock_options', 'restricted_stock_deferred',
-                                'restricted_stock_deferred_discrete', 'deferral_payments']
+best_knn_feature_list_scaled = ['poi', 'bonus', 'exercised_stock_options', 'total_stock_value', 'deferral_payments',
+                                'restricted_stock_deferred_discrete', 'restricted_stock_deferred']
 
-best_knn_feature_list_not_scaled = ['poi', 'bonus', 'salary', 'count_nans', 'exercised_stock_options',
-                                    'deferral_payments', 'other']
+best_knn_feature_list_not_scaled = ['poi', 'bonus', 'exercised_stock_options', 'salary', 'loan_advances_discrete']
+# best_knn_feature_list_not_scaled = ['poi', 'bonus', 'salary', 'count_nans', 'exercised_stock_options',
+#                                     'deferral_payments', 'other']
 
 best_adaboost_feature_list = ['poi', 'deferred_income', 'count_nans', 'salary', 'exercised_stock_options',
                               'expenses', 'to_messages', 'shared_receipt_with_poi', 'other', 'from_poi_to_this_person']
@@ -234,7 +267,7 @@ def KNN_model_not_scaled(n_neighbors=5, weights='distance'):
     return KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights)
 
 
-def KNN_model_scaled(n_neighbors=5, weights='uniform'):
+def KNN_model_scaled(n_neighbors=3, weights='uniform'):
     return Pipeline([('scaling', preprocessing.StandardScaler()),
                      ('knn', KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights))])
 
@@ -247,12 +280,12 @@ def AdA_model():
 
 
 # My own tester
-def test_classifier(features, labels, clf):
+def test_classifier(features, labels, clf, n_splits=2500, show_results=False):
     """
     The difference to the tester.py is that the metrics are calculated for every run an averaged at the end.
     """
     accu, r_precision, r_recall, r_f1 = [], [], [], []
-    cv = StratifiedShuffleSplit(n_splits=2500, test_size=0.3, random_state=42)
+    cv = StratifiedShuffleSplit(n_splits=n_splits, test_size=0.3, random_state=42)
     for train_indx, test_indx in cv.split(features, labels):
         features_train = []
         features_test = []
@@ -275,78 +308,106 @@ def test_classifier(features, labels, clf):
             r_recall.append(recall_score(labels_test, pred))
             r_f1.append(f1_score(labels_test, pred))
 
-    if True:
+    accuray = np.mean(accu)
+    precision = np.mean(r_precision)
+    recall = np.mean(r_recall)
+    f1 = np.mean(r_f1)
+
+    if show_results:
         print "Classifier:", clf
-        print "Accuracy:", np.mean(accu), "Precision:", np.mean(r_precision), \
-            "Recall", np.mean(r_recall), "F1", np.mean(r_f1)
+        print "Accuracy:", accuray, "Precision:", precision, \
+            "Recall", recall, "F1", f1
         print ""
+
+    return (accuray, precision, recall, f1)
 
 
 # wrapper for the tester.py
 def baseline_tester(features_list, classifier):
+    print "features used:", features_list
     dump_classifier_and_data(classifier, my_dataset, features_list)
     tester.main()
 
 
 # wrapper for my own tester
-def baseline_own_testing(feat, cls):
+def baseline_own_testing(feat, cls, n_splits=1000, show_results=False):
     labels, features = targetFeatureSplit(featureFormat(my_dataset, feat,
                                                         sort_keys=True))
-    test_classifier(features, labels, cls)
+    return test_classifier(features, labels, cls, n_splits=n_splits, show_results=show_results)
 
-# Run the tester
-if False:
-    print "# Running a Model #"
-    # baseline_tester(best_knn_feature_list_not_scaled, KNN_model_not_scaled(weights="uniform"))
-    baseline_own_testing(best_knn_feature_list_not_scaled, KNN_model_not_scaled(weights="uniform"))
+
+def run_both_testers(feature_list, model):
+    print "# Running a Model with both testers #"
+    baseline_tester(feature_list, model)
+    baseline_own_testing(feature_list, model, 1000, show_results=True)
 
 
 # Function to add (and substract) features for search for best feature combination
-def vary_features_add(features, classifier):
-    print "Baseline - adding"
-    baseline_tester(features, classifier)
+def vary_features(input_features, classifier, testing_function=baseline_own_testing, show_results=False, score="f1"):
+    combinations_tested = []
 
-    original = copy.copy(features)
-    for feat in all_features:
-        print "trying: ", feat
+    d = {"accuracy": 0,
+         "precision": 1,
+         "recall": 2,
+         "f1": 3}
+
+    target = d[score]
+
+    if show_results:
+        print "# Varying features #"
+        print "features used:", len(input_features), " -> ", input_features
+    combinations_tested.append((testing_function(input_features, classifier)[target], input_features))
+
+    if show_results:
+        print "## Elimiating ##"
+
+    original = copy.copy(input_features)
+    for i, feat in enumerate(original[1:]):
         features = copy.copy(original)
+        if show_results:
+            print "trying", feat
+        features.pop(i + 1)
+        if show_results:
+            print "features used:", len(features), " -> ", features
+        f1 = testing_function(features, classifier)[target]
+        if f1 > 0:
+            combinations_tested.append((f1, features))
 
+    if show_results:
+        print "## Adding ##"
+    testing_function(original, classifier)
+    for feat in all_features:
+        if show_results:
+            print "trying: ", feat
+        features = copy.copy(original)
         if feat in features:
             continue
         else:
             features.append(feat)
-        print "features used:", len(features), " -> ", features
+        if show_results:
+            print "features used:", len(features), " -> ", features
+        f1 = testing_function(features, classifier)[target]
+        if f1 > 0:
+            combinations_tested.append((f1, features))
 
-        dump_classifier_and_data(classifier, my_dataset, features)
-        tester.main()
-
-
-def vary_features_eliminate(features, classifier):
-    print "Baseline - Elimination"
-    baseline_tester(features, classifier)
-
-    original = copy.copy(features)
-    for i, feat in enumerate(features[1:]):
-        features = copy.copy(original)
-        print "trying", feat
-        features.pop(i + 1)
-        print "features used:", len(features), " -> ", features
-        dump_classifier_and_data(classifier, my_dataset, features)
-        tester.main()
+    return combinations_tested
 
 
-# wrapper for the vary functions
-def vary_wrapper(feat_list, model):
-    print "# Varying features #"
-    print "## Elimiating ##"
-    vary_features_eliminate(feat_list, model)
-    print "## Adding ##"
-    vary_features_add(feat_list, model)
+# Recursive Wrapper for the varying function
+def vary_recursive(feature_list, model, score="f1"):
+    results = vary_features(feature_list, model, show_results=False, score=score)
+    results_sorted = sorted(results, reverse=True)
 
+    if results_sorted[0][1] == feature_list:
+        print "best found, " + score, results_sorted[0]
+        print "performace own tester"
+        baseline_own_testing(results_sorted[0][1], model, show_results=True)
+        print "performace tester.py"
+        baseline_tester(results_sorted[0][1], model)
 
-# Run the wrapper
-if False:
-    vary_wrapper(starting_features, AdA_model())
+    else:
+        print "trying another, " + score, results_sorted[0]
+        vary_recursive(results_sorted[0][1], model)
 
 
 # some tuning functions to find the best params for the models
@@ -359,6 +420,16 @@ def tuning_knn_scaled():
         baseline_tester(best_knn_feature_list_scaled, KNN_model_scaled(n, 'uniform'))
         print n, 'distance'
         baseline_tester(best_knn_feature_list_scaled, KNN_model_scaled(n, 'distance'))
+
+
+def tuning_knn(feature_list):
+    param_grid = {'knn__n_neighbors': [3, 4, 5, 6, 7], 'knn__weights': ['uniform', 'distance']}
+    clf = GridSearchCV(KNN_model_scaled(), param_grid, scoring="f1")
+    labels, features = targetFeatureSplit(featureFormat(my_dataset, feature_list, sort_keys=True))
+    # print KNN_model_scaled().get_params().keys()
+    clf.fit(features, labels)
+    result = pd.DataFrame(clf.cv_results_)
+    return result
 
 
 def tuning_knn_not_scaled():
@@ -400,42 +471,48 @@ def show_final_scores():
     Function shows all classifiers and their performance on the tester.py.
     """
     print ""
-    print "*** Final Scores ***"
+    print "*** Final Scores - tester.py ***"
     print ""
     print "AdaBoost"
-    dump_classifier_and_data(AdA_model(), my_dataset, best_adaboost_feature_list)
-    tester.main()
+    baseline_tester(best_adaboost_feature_list, AdA_model())
     print ""
     print "Naive Bayes"
-    dump_classifier_and_data(NB_model(), my_dataset, best_nb_feature_list)
-    tester.main()
+    baseline_tester(best_nb_feature_list, NB_model())
     print ""
     print "Desicion Tree"
-    dump_classifier_and_data(DT_model(), my_dataset, best_dt_feature_list)
-    tester.main()
+    baseline_tester(best_dt_feature_list, DT_model())
     print ""
     print "K-Neigbohrs scaled"
-    print "features used", best_knn_feature_list_scaled
-    dump_classifier_and_data(KNN_model_scaled(), my_dataset, best_knn_feature_list_scaled)
-    tester.main()
+    baseline_tester(best_knn_feature_list_scaled, KNN_model_scaled())
     print ""
     print "K-Neighbors not scaled"
-    print "features used", best_knn_feature_list_not_scaled
-    dump_classifier_and_data(KNN_model_not_scaled(), my_dataset, best_knn_feature_list_not_scaled)
-    tester.main()
+    baseline_tester(best_knn_feature_list_not_scaled, KNN_model_not_scaled())
 
+
+if False:
+    run_both_testers(best_knn_feature_list_scaled, KNN_model_scaled(n_neighbors=3, weights='uniform'))
+
+if False:
+    print "## Recursive Loop ##"
+    vary_recursive(best_knn_feature_list_scaled, KNN_model_scaled(n_neighbors=3), score="f1")
+
+if False:
+    # tuning_knn_scaled()
+    print tuning_knn(best_knn_feature_list_scaled)
 
 if True:
     show_final_scores()
 
-
-if True:
+if False:
     # Surprisingly I was not able to train the K-Neighbors algorithm for the scaled features as well as for the
     # unscaled. With a Precision of .73, a recall of .43 and a F1 of .54 this seems to be the best. I used
     # n_neighbors = 5 and weights = 'distance'
-    print "# Submitting final model: K-Neighbors not scaled #"
-    dump_classifier_and_data(KNN_model_not_scaled(),
+    print "# Submitting final model #"
+    print KNN_model_scaled()
+    dump_classifier_and_data(KNN_model_scaled(),
                              my_dataset,
-                             best_knn_feature_list_not_scaled)
+                             best_knn_feature_list_scaled)
 
 print "# End #"
+
+
