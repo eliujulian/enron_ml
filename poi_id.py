@@ -28,17 +28,17 @@ import copy
 
 print "# Starting #"
 
-### Load the dictionary containing the dataset
+# Load the dictionary containing the dataset
 print "# Loading Data #"
 with open("final_project_dataset.pkl", "r") as data_file:
     data_dict = pickle.load(data_file)
 
 
-### Remove outliers
+# Remove outliers
 print "# Removing Outliers #"
 data_dict.pop('TOTAL')
 
-### Create new features
+# Create new features
 
 print "# Data Exploration #"
 
@@ -49,25 +49,30 @@ def get_nan_ratios(ratio=0.0):
     """
     result = []
     for x in data_dict['SKILLING JEFFREY K'].keys():
-        r = float(len([v[x] for k, v in data_dict.iteritems() if v[x] == "NaN"])) / float(len(data_dict))
+        r = float(len([v_[x] for k_, v_ in data_dict.iteritems() if v_[x] == "NaN"])) / float(len(data_dict))
         if r >= ratio:
             result.append((x, r))
     return result
 
 
 if False:
-    # total number of data points: 145
     print "total number of data points:", len(data_dict)
-    # allocation across classes (POI/non-POI): 18  /  127
+    # > total number of data points: 145
+
     print "allocation across classes (POI/non-POI):", sum([v['poi'] for k, v in data_dict.iteritems()]), " / ", \
         len(data_dict) - sum([v['poi'] for k, v in data_dict.iteritems()])
-    # features with more than 70 % NaNs [('restricted_stock_deferred', 0.8827586206896552),
-    # ('loan_advances', 0.9793103448275862), ('director_fees', 0.8896551724137931)]
+    # > allocation across classes (POI/non-POI): 18  /  127
+
+    print "number of features in dataset:", len(list(data_dict['SKILLING JEFFREY K'].keys()))
+    # > number of features in dataset: 21
+
     print "features with more than 75 % NaNs", get_nan_ratios(ratio=0.75)
+    # > features with more than 75 % NaNs [('restricted_stock_deferred', 0.8827586206896552),
+    # > ('loan_advances', 0.9793103448275862), ('director_fees', 0.8896551724137931)]
 
 
-## Creating discrete features from continious features that are mostly 'NaN'.
-## Choosing continious features with more than 80 % 'NaN's. Assigning 0 if NaN or == 0, else 1.
+# Creating discrete features from continious features that are mostly 'NaN'.
+# Choosing continious features with more than 80 % 'NaN's. Assigning 0 if NaN or == 0, else 1.
 
 
 print "# Creating new features #"
@@ -77,11 +82,11 @@ def new_discrete_feature(feature):
     """
     Function to create new discrete features.
     """
-    for k, v in data_dict.iteritems():
-        if v[feature] == 'NaN' or v[feature] == 0:
-            v[feature + "_discrete"] = 0
+    for k_, v_ in data_dict.iteritems():
+        if v_[feature] == 'NaN' or v_[feature] == 0:
+            v_[feature + "_discrete"] = 0
         else:
-            v[feature + "_discrete"] = 1
+            v_[feature + "_discrete"] = 1
 
 # Here are the new features created
 for n in get_nan_ratios(ratio=0.8):
@@ -89,36 +94,38 @@ for n in get_nan_ratios(ratio=0.8):
 
 
 def analyze_email():
-    "Helper funtion to look at the email feature."
-    for k, v in data_dict.iteritems():
-        if v['email_address'] == "NaN":
-            pprint(k)
-            pprint(data_dict[k])
+    """
+    Helper function to look at the email feature.
+    """
+    for k_, v_ in data_dict.iteritems():
+        if v_['email_address'] == "NaN":
+            pprint(k_)
+            pprint(data_dict[k_])
 
 
-## Creating a feature that counts the number von NaNs for each person
+# Creating a feature that counts the number von NaNs for each person
 
 def count_nans_for_one_person(person_dict):
     result = 0
-    for k, v in person_dict.iteritems():
-        if v == 'NaN':
+    for k_, v_ in person_dict.iteritems():
+        if v_ == 'NaN':
             result += 1
     return result
 
 
 def count_all_nans(add_to_dict=False):
     result = {}
-    for k, v in data_dict.iteritems():
-        c = count_nans_for_one_person(v)
-        result[k] = c
+    for k_, v_ in data_dict.iteritems():
+        c = count_nans_for_one_person(v_)
+        result[k_] = c
         if add_to_dict:
-            v['count_nans'] = c
+            v_['count_nans'] = c
     return result
 
 count_all_nans(add_to_dict=True)
 
 
-## Feature counts words in name/key
+# Feature counts words in name/key
 
 def count_words_in_key(key):
     return len(key.split())
@@ -126,21 +133,22 @@ def count_words_in_key(key):
 
 def count_all_words(add_to_dicts=False):
     result = {}
-    for k, v in data_dict.iteritems():
-        c = count_words_in_key(k)
-        result[k] = c
+    for k_, v_ in data_dict.iteritems():
+        c = count_words_in_key(k_)
+        result[k_] = c
         if add_to_dicts:
-            v['count_words'] = c
+            v_['count_words'] = c
     return result
 
 count_all_words(add_to_dicts=True)
 
 
-### Analyzing the features
+# Analyzing the features
 
 # Helper to loop over the features
 all_features = list(data_dict['SKILLING JEFFREY K'].keys())
-all_features.pop(6) # Remove email
+all_features.pop(6)  # Remove email
+
 
 # I used the following features to select some feature to start feeding into the classifiers
 def correlation_with_nan_as_zero():
@@ -148,13 +156,13 @@ def correlation_with_nan_as_zero():
     Correlation between a feature an the label by pearsons r.
     """
     print "### Correaltion with NaN ###"
-    labels = [v['poi'] for _, v in data_dict.iteritems()]
+    labels = [v_['poi'] for _, v_ in data_dict.iteritems()]
 
     def tmp():
         result = {}
         for f in all_features:
             x, y = [], []
-            for a, b in zip(labels, [v[f] for _, v in data_dict.iteritems()]):
+            for a, b in zip(labels, [v_1[f] for _, v_1 in data_dict.iteritems()]):
                 if b != "NaN":
                     x.append(a)
                     y.append(b)
@@ -183,7 +191,7 @@ def get_features_from_correlation(min_corr=0.26):
 
 
 def get_pandas_dataframe(nan_as_zero=False):
-    df =  pd.DataFrame.from_dict(data_dict).transpose()
+    df = pd.DataFrame.from_dict(data_dict).transpose()
     if nan_as_zero:
         def convert(x):
             if isinstance(x, int):
@@ -196,28 +204,28 @@ def get_pandas_dataframe(nan_as_zero=False):
                 else:
                     raise Exception("Not possible")
         for c in all_features:
-            df[c] = [convert(n) for n in df[c]]
+            df[c] = [convert(n_) for n_ in df[c]]
     return df
 
 
 def get_starting_features_from_df(min_corr=0.26, print_results=False):
     df = get_pandas_dataframe(nan_as_zero=True).corr()
     df_corr_poi = df['poi']
-    result = df_corr_poi[abs(df_corr_poi) >= 0.26]
+    result = df_corr_poi[abs(df_corr_poi) >= min_corr]
 
     if print_results:
         print result.sort_values(ascending=False)
 
-    result = [n for n in result.axes[0]]
+    result = [n_ for n_ in result.axes[0]]
     result.remove('poi')
     result.insert(0, 'poi')
     return result
 
 
-### Store to my_dataset for easy export#  below.
+# Store to my_dataset for easy export#  below.
 my_dataset = data_dict
 
-### Extract features and labels from dataset for local testing
+# Extract features and labels from dataset for local testing
 
 
 # The following feature lists are the result of a add and substract search with Naive Bayes, Desicion Tree and
@@ -229,31 +237,56 @@ starting_features = get_starting_features_from_df(print_results=False)
 
 temp_list = ['poi', 'exercised_stock_options', 'deferral_payments']
 
-best_nb_feature_list = ['poi', 'deferred_income', 'total_stock_value', 'salary', 'exercised_stock_options', 'expenses']
+best_nb_feature_list = ['poi',
+                        'deferred_income',
+                        'total_stock_value',
+                        'salary',
+                        'exercised_stock_options',
+                        'expenses']
 
-best_dt_feature_list = ['poi', 'deferred_income', 'exercised_stock_options', 'expenses', 'deferral_payments',
+best_dt_feature_list = ['poi',
+                        'deferred_income',
+                        'exercised_stock_options',
+                        'expenses',
+                        'deferral_payments',
                         'director_fees']
 
-best_knn_feature_list_scaled = ['poi', 'bonus', 'exercised_stock_options', 'total_stock_value', 'deferral_payments',
-                                'restricted_stock_deferred_discrete', 'restricted_stock_deferred']
+best_knn_feature_list_scaled = ['poi',
+                                'bonus',
+                                'exercised_stock_options',
+                                'total_stock_value',
+                                'deferral_payments',
+                                'restricted_stock_deferred_discrete',
+                                'restricted_stock_deferred']
 
-best_knn_feature_list_not_scaled = ['poi', 'bonus', 'exercised_stock_options', 'salary', 'loan_advances_discrete']
-# best_knn_feature_list_not_scaled = ['poi', 'bonus', 'salary', 'count_nans', 'exercised_stock_options',
-#                                     'deferral_payments', 'other']
+best_knn_feature_list_not_scaled = ['poi',
+                                    'bonus',
+                                    'exercised_stock_options',
+                                    'salary',
+                                    'loan_advances_discrete']
 
-best_adaboost_feature_list = ['poi', 'deferred_income', 'count_nans', 'salary', 'exercised_stock_options',
-                              'expenses', 'to_messages', 'shared_receipt_with_poi', 'other', 'from_poi_to_this_person']
+best_adaboost_feature_list = ['poi',
+                              'deferred_income',
+                              'count_nans',
+                              'salary',
+                              'exercised_stock_options',
+                              'expenses',
+                              'to_messages',
+                              'shared_receipt_with_poi',
+                              'other',
+                              'from_poi_to_this_person']
 
-### Task 4: Try a varity of classifiers
-### Please name your classifier clf for easy export below.
-### Note that if you want to do PCA or other multi-stage operations,
-### you'll need to use Pipelines. For more info:
-### http://scikit-learn.org/stable/modules/pipeline.html
+# Task 4: Try a varity of classifiers
+# Please name your classifier clf for easy export below.
+# Note that if you want to do PCA or other multi-stage operations,
+# you'll need to use Pipelines. For more info:
+# http://scikit-learn.org/stable/modules/pipeline.html
 
 # The following functions are used for optimization. For local validation I used a simple loop over a train_test_split
 # Besides this validation was mostly done by directly using the tester.main()
 
-## Here are five models:
+# Here are five models:
+
 
 def NB_model():
     return GaussianNB()
@@ -343,7 +376,8 @@ def run_both_testers(feature_list, model):
 
 
 # Function to add (and substract) features for search for best feature combination
-def vary_features(input_features, classifier, testing_function=baseline_own_testing, show_results=False, score="f1"):
+def vary_features(input_features, classifier, testing_function=baseline_own_testing, show_results=False,
+                  score="f1"):
     combinations_tested = []
 
     d = {"accuracy": 0,
@@ -415,11 +449,11 @@ def tuning_knn_scaled():
     """
     Best: k = 5, weights = 'uniform'
     """
-    for n in range(1, 11):
-        print n, 'uniform'
-        baseline_tester(best_knn_feature_list_scaled, KNN_model_scaled(n, 'uniform'))
-        print n, 'distance'
-        baseline_tester(best_knn_feature_list_scaled, KNN_model_scaled(n, 'distance'))
+    for n_ in range(1, 11):
+        print n_, 'uniform'
+        baseline_tester(best_knn_feature_list_scaled, KNN_model_scaled(n_, 'uniform'))
+        print n_, 'distance'
+        baseline_tester(best_knn_feature_list_scaled, KNN_model_scaled(n_, 'distance'))
 
 
 def tuning_knn(feature_list):
@@ -436,11 +470,11 @@ def tuning_knn_not_scaled():
     """
     Best: k = 5, weights = 'distance'
     """
-    for n in range(1, 11):
-        print n, 'uniform'
-        baseline_tester(best_knn_feature_list_not_scaled, KNN_model_not_scaled(n, 'uniform'))
-        print n, 'distance'
-        baseline_tester(best_knn_feature_list_not_scaled, KNN_model_not_scaled(n, 'distance'))
+    for n2 in range(1, 11):
+        print n2, 'uniform'
+        baseline_tester(best_knn_feature_list_not_scaled, KNN_model_not_scaled(n2, 'uniform'))
+        print n2, 'distance'
+        baseline_tester(best_knn_feature_list_not_scaled, KNN_model_not_scaled(n2, 'distance'))
 
 
 def tuning_dt():
@@ -454,9 +488,9 @@ def tuning_dt():
         print "max depth"
         print "none"
         baseline_tester(best_dt_feature_list, DT_model(max_depth=None))
-        for n in range(1, 10):
-            print n
-            baseline_tester(best_dt_feature_list, DT_model(max_depth=n))
+        for n_ in range(1, 10):
+            print n_
+            baseline_tester(best_dt_feature_list, DT_model(max_depth=n_))
     if True:
         labels, features = targetFeatureSplit(featureFormat(my_dataset, best_knn_feature_list_scaled,
                                                             sort_keys=True))
@@ -491,6 +525,9 @@ def show_final_scores():
 
 if False:
     run_both_testers(best_knn_feature_list_scaled, KNN_model_scaled(n_neighbors=3, weights='uniform'))
+    # print "final + count nans"
+    # run_both_testers(best_knn_feature_list_scaled + ['count_nans'], KNN_model_scaled(n_neighbors=3,
+    # weights='uniform'))
 
 if False:
     print "## Recursive Loop ##"
@@ -504,9 +541,6 @@ if False:
     show_final_scores()
 
 if True:
-    # Surprisingly I was not able to train the K-Neighbors algorithm for the scaled features as well as for the
-    # unscaled. With a Precision of .73, a recall of .43 and a F1 of .54 this seems to be the best. I used
-    # n_neighbors = 5 and weights = 'distance'
     print "# Submitting final model #"
     print KNN_model_scaled()
     dump_classifier_and_data(KNN_model_scaled(),
@@ -514,5 +548,3 @@ if True:
                              best_knn_feature_list_scaled)
 
 print "# End #"
-
-
