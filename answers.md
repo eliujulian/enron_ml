@@ -208,8 +208,11 @@ For the scaled features 'uniform' weighting did best, for the unscaled 'distance
 
 * Validation is used to test if the model is doing well on data not know to the model, means data it was not trained on.
 * Validation was difficult because of the small set of positive poi's (just 18 in the dataset). I therefore run the 
-model often (1,000 times) and averaged the scores. Besides this I used the slightly different tester.py script to 
-validate my models.
+model often (1,000 times) and averaged the scores. For validation the dataset was split each time into a training and
+ a test dataset. Because of the small number of positive samples a StratifiedShuffleSplit was used to make sure that 
+ some positive samples are in each group. If there would be zero or nearly zero positive samples in the training or
+ test dataset the results would not be meaningfull. 
+*  Besides this I used the slightly different (already provided) tester.py script to validate my models.
 
 6. Give at least 2 evaluation metrics and your average performance for each of them.  Explain an interpretation of your 
 metrics that says something human-understandable about your algorithm’s performance. [relevant rubric item: “usage of 
